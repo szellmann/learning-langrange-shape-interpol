@@ -175,9 +175,7 @@ int main() {
   stack[ptr++] = interval(-9.f, 7.f);
 
   interval ival = stack[--ptr];
-  int steps=0;
   while (poly.eval(ival).contains(0.f)) {
-    std::cout << steps++ << '\n';
 
     interval v = poly.eval(ival);
     if (v.length() < 0.00001f) {
