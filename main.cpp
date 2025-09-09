@@ -1,24 +1,24 @@
 #include <iostream>
 
-struct interval
+struct interval1
 {
-  interval() = default;
-  interval(float f) : lo(f), hi(f) {}
-  interval(float l, float h) : lo(l), hi(h) {}
+  interval1() = default;
+  interval1(float f) : lo(f), hi(f) {}
+  interval1(float l, float h) : lo(l), hi(h) {}
   float length() const { return hi-lo; }
   bool contains(float f) const { return lo <= f && f <= hi; }
   float lo, hi;
 };
 
-inline interval operator+(interval a, interval b) {
+inline interval1 operator+(interval1 a, interval1 b) {
   return { a.lo+b.lo, a.hi+b.hi };
 }
 
-inline interval operator-(interval a, interval b) {
+inline interval1 operator-(interval1 a, interval1 b) {
   return { a.lo-b.lo, a.hi-b.hi };
 }
 
-inline interval operator*(interval a, interval b) {
+inline interval1 operator*(interval1 a, interval1 b) {
   float ac = a.lo*b.lo;
   float ad = a.lo*b.hi;
   float bc = a.hi*b.lo;
@@ -29,7 +29,7 @@ inline interval operator*(interval a, interval b) {
   };
 }
 
-inline interval operator/(interval a, interval b) {
+inline interval1 operator/(interval1 a, interval1 b) {
   // special handling for "division by zero" (eqvl. 0 in b)
   if (b.lo <= 0.f && 0.f <= b.hi) {
     return { -INFINITY, INFINITY };
@@ -45,27 +45,27 @@ inline interval operator/(interval a, interval b) {
   };
 }
 
-inline interval& operator+=(interval& a, const interval& b) {
+inline interval1& operator+=(interval1& a, const interval1& b) {
   a = a + b;
   return a;
 }
 
-inline interval& operator-=(interval& a, const interval& b) {
+inline interval1& operator-=(interval1& a, const interval1& b) {
   a = a - b;
   return a;
 }
 
-inline interval& operator*=(interval& a, const interval& b) {
+inline interval1& operator*=(interval1& a, const interval1& b) {
   a = a * b;
   return a;
 }
 
-inline interval& operator/=(interval& a, const interval& b) {
+inline interval1& operator/=(interval1& a, const interval1& b) {
   a = a / b;
   return a;
 }
 
-inline std::ostream& operator<<(std::ostream& out, interval ival) {
+inline std::ostream& operator<<(std::ostream& out, interval1 ival) {
   out << '[' << ival.lo << ':' << ival.hi << ']';
   return out;
 }
@@ -73,15 +73,14 @@ inline std::ostream& operator<<(std::ostream& out, interval ival) {
 struct LagrangePolynomial
 {
   static constexpr int D=4;
-  float p[D];
-  float f[D];
+  float value[D];
 
   template <typename T>
   T evalBasis(const T& x, int j) const {
     T res={1.f};
-    T xj(p[j]);
+    T xj((float)j);
     for (int i=0; i<D; ++i) {
-      if (i != j) res *= (x-p[i])/(xj-p[i]);
+      if (i != j) res *= (x-i)/(xj-i);
     }
     return res;
   }
@@ -90,56 +89,23 @@ struct LagrangePolynomial
   T eval(const T& x) const {
     T res={0.f};
     for (int i=0; i<D; ++i) {
-      res += f[i]*evalBasis(x,i);
-    }
-    return res;
-  }
-
-  float evalBasisDeriv(float x, int j) const {
-    float a=0.f;
-    for (int i=0; i<D; ++i) {
-      float b = 1.f;
-      if (i != j) {
-        for (int k=0; k<D; ++k) {
-          if (k != i && k != j) {
-            b *= x-p[k];
-          }
-        }
-        a += b;
-      }
-    }
-
-    float c=1.f;
-    float xj = p[j];
-    for (int i=0; i<D; ++i) {
-      if (i != j) c *= xj-p[i];
-    }
-    return a/c;
-  }
-
-  float evalDeriv(float x) const {
-    float res=0.f;
-    for (int i=0; i<D; ++i) {
-      res += f[i]*evalBasisDeriv(x,i);
+      res += value[i]*evalBasis(x,i);
     }
     return res;
   }
 };
 
-//https://www.researchgate.net/profile/Ali-Yazici-2/publication/221434767_2d_Polynomial_Interpolation_A_Symbolic_Approach_with_Mathematica/links/579f35e308ae80bf6ea792f9/2d-Polynomial-Interpolation-A-Symbolic-Approach-with-Mathematica.pdf
 struct LagrangeQuad
 {
   static constexpr int D=4;
-  float px[D];
-  float py[D];
-  float f[D][D];
+  float value[D][D];
 
   template <typename T>
-  T evalBasis(float *p, const T& x, int j) const {
+  T evalBasis(const T& x, int j) const {
     T res={1.f};
-    T xj(p[j]);
+    T xj((float)j);
     for (int i=0; i<D; ++i) {
-      if (i != j) res *= (x-p[i])/(xj-p[i]);
+      if (i != j) res *= (x-i)/(xj-i);
     }
     return res;
   }
@@ -148,10 +114,10 @@ struct LagrangeQuad
   T eval(const T& x, const T& y) const {
     T res={0.f};
     for (int i=0; i<D; ++i) {
-      T lx = evalBasis(px,x,i);
+      T lx = evalBasis(x,i);
       for (int j=0; j<D; ++j) {
-        T my = evalBasis(py,y,j);
-        res += f[i][j]*lx*my;
+        T my = evalBasis(y,j);
+        res += value[i][j]*lx*my;
       }
     }
     return res;
@@ -160,30 +126,26 @@ struct LagrangeQuad
 
 int main() {
   LagrangePolynomial poly;
-  poly.p[0] = -9;
-  poly.p[1] = -4;
-  poly.p[2] = -1;
-  poly.p[3] =  7;
+  poly.value[0] = -4;
+  poly.value[1] =  4;
+  poly.value[2] =  6;
+  poly.value[3] =  8;
 
-  poly.f[0] =  5;
-  poly.f[1] =  2;
-  poly.f[2] = -2;
-  poly.f[3] =  9;
-
-  interval stack[32];
+#if 1
+  interval1 stack[32];
   int ptr = 0;
-  stack[ptr++] = interval(-9.f, 7.f);
+  stack[ptr++] = interval1(0.f, 3.f);
 
-  interval ival = stack[--ptr];
+  interval1 ival = stack[--ptr];
   while (poly.eval(ival).contains(0.f)) {
 
-    interval v = poly.eval(ival);
+    interval1 v = poly.eval(ival);
     if (v.length() < 0.00001f) {
       break;
     }
 
-    interval a(ival.lo, ival.lo+ival.length()*0.5f);
-    interval b(ival.lo+ival.length()*0.5f, ival.hi);
+    interval1 a(ival.lo, ival.lo+ival.length()*0.5f);
+    interval1 b(ival.lo+ival.length()*0.5f, ival.hi);
 
     bool b1 = poly.eval(a).contains(0.f);
     bool b2 = poly.eval(b).contains(0.f);
@@ -201,10 +163,11 @@ int main() {
       break;
     }
   }
-  interval iv = poly.eval(ival);
+  interval1 iv = poly.eval(ival);
   std::cout << ival << iv << '\n';
+#endif
 
-  float val = poly.eval(-2.57413f);
+  float val = poly.eval(0.36563f);
   std::cout << val << '\n';
 }
 
