@@ -1,8 +1,74 @@
 #include <iostream>
 
-struct float3 {
-  float x, y, z;
+struct interval
+{
+  interval() = default;
+  interval(float f) : lo(f), hi(f) {}
+  interval(float l, float h) : lo(l), hi(h) {}
+  float length() const { return hi-lo; }
+  bool contains(float f) const { return lo <= f && f <= hi; }
+  float lo, hi;
 };
+
+inline interval operator+(interval a, interval b) {
+  return { a.lo+b.lo, a.hi+b.hi };
+}
+
+inline interval operator-(interval a, interval b) {
+  return { a.lo-b.lo, a.hi-b.hi };
+}
+
+inline interval operator*(interval a, interval b) {
+  float ac = a.lo*b.lo;
+  float ad = a.lo*b.hi;
+  float bc = a.hi*b.lo;
+  float bd = a.hi*b.hi;
+  return {
+    fminf(ac,fminf(ad,fminf(bc,bd))),
+    fmaxf(ac,fmaxf(ad,fmaxf(bc,bd)))
+  };
+}
+
+inline interval operator/(interval a, interval b) {
+  // special handling for "division by zero" (eqvl. 0 in b)
+  if (b.lo <= 0.f && 0.f <= b.hi) {
+    return { -INFINITY, INFINITY };
+  }
+
+  float ac = a.lo/b.lo;
+  float ad = a.lo/b.hi;
+  float bc = a.hi/b.lo;
+  float bd = a.hi/b.hi;
+  return {
+    fminf(ac,fminf(ad,fminf(bc,bd))),
+    fmaxf(ac,fmaxf(ad,fmaxf(bc,bd)))
+  };
+}
+
+inline interval& operator+=(interval& a, const interval& b) {
+  a = a + b;
+  return a;
+}
+
+inline interval& operator-=(interval& a, const interval& b) {
+  a = a - b;
+  return a;
+}
+
+inline interval& operator*=(interval& a, const interval& b) {
+  a = a * b;
+  return a;
+}
+
+inline interval& operator/=(interval& a, const interval& b) {
+  a = a / b;
+  return a;
+}
+
+inline std::ostream& operator<<(std::ostream& out, interval ival) {
+  out << '[' << ival.lo << ':' << ival.hi << ']';
+  return out;
+}
 
 struct LagrangePolynomial
 {
@@ -10,17 +76,19 @@ struct LagrangePolynomial
   float p[D];
   float f[D];
 
-  float evalBasis(float x, int j) const {
-    float res=1.f;
-    float xj = p[j];
+  template <typename T>
+  T evalBasis(const T& x, int j) const {
+    T res={1.f};
+    T xj(p[j]);
     for (int i=0; i<D; ++i) {
       if (i != j) res *= (x-p[i])/(xj-p[i]);
     }
     return res;
   }
 
-  float eval(float x) const {
-    float res=0.f;
+  template <typename T>
+  T eval(const T& x) const {
+    T res={0.f};
     for (int i=0; i<D; ++i) {
       res += f[i]*evalBasis(x,i);
     }
@@ -58,28 +126,36 @@ struct LagrangePolynomial
   }
 };
 
-struct LagrangeHex
+//https://www.researchgate.net/profile/Ali-Yazici-2/publication/221434767_2d_Polynomial_Interpolation_A_Symbolic_Approach_with_Mathematica/links/579f35e308ae80bf6ea792f9/2d-Polynomial-Interpolation-A-Symbolic-Approach-with-Mathematica.pdf
+struct LagrangeQuad
 {
-  /*static constexpr int D=4;
-  float3 p[D];
-  float f[D];
+  static constexpr int D=4;
+  float px[D];
+  float py[D];
+  float f[D][D];
 
-  float evalBasis(float x, int j) const {
-    float res=1.f;
-    float xj = p[j];
+  template <typename T>
+  T evalBasis(float *p, const T& x, int j) const {
+    T res={1.f};
+    T xj(p[j]);
     for (int i=0; i<D; ++i) {
       if (i != j) res *= (x-p[i])/(xj-p[i]);
     }
     return res;
   }
 
-  float eval(float x) const {
-    float res=0.f;
+  template <typename T>
+  T eval(const T& x, const T& y) const {
+    T res={0.f};
     for (int i=0; i<D; ++i) {
-      res += f[i]*evalBasis(x,i);
+      T lx = evalBasis(px,x,i);
+      for (int j=0; j<D; ++j) {
+        T my = evalBasis(py,y,j);
+        res += f[i][j]*lx*my;
+      }
     }
     return res;
-  }*/
+  }
 };
 
 int main() {
@@ -94,9 +170,45 @@ int main() {
   poly.f[2] = -2;
   poly.f[3] =  9;
 
-  float val = poly.eval(5.f);
-  std::cout << val << '\n';
+  interval stack[32];
+  int ptr = 0;
+  stack[ptr++] = interval(-9.f, 7.f);
 
-  float der = poly.evalDeriv(1.5f);
-  std::cout << der << '\n';
+  interval ival = stack[--ptr];
+  int steps=0;
+  while (poly.eval(ival).contains(0.f)) {
+    std::cout << steps++ << '\n';
+
+    interval v = poly.eval(ival);
+    if (v.length() < 0.00001f) {
+      break;
+    }
+
+    interval a(ival.lo, ival.lo+ival.length()*0.5f);
+    interval b(ival.lo+ival.length()*0.5f, ival.hi);
+
+    bool b1 = poly.eval(a).contains(0.f);
+    bool b2 = poly.eval(b).contains(0.f);
+
+    if (b1 && b2) {
+      ival = a;
+      stack[ptr++] = b;
+    } else if (b1 && !b2) {
+      ival = a;
+    } else if (!b1 && b2) {
+      ival = b;
+    } else if (ptr > 0) {
+      ival = stack[--ptr];
+    } else {
+      break;
+    }
+  }
+  interval iv = poly.eval(ival);
+  std::cout << ival << iv << '\n';
+
+  float val = poly.eval(-2.57413f);
+  std::cout << val << '\n';
 }
+
+
+
