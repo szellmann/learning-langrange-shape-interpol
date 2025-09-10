@@ -51,7 +51,6 @@ bool sample(const LagrangeHex<float3> &hex, float3 P) {
 
 next:
   while (ptr > 0) {
-    steps++;
     ival = stack[--ptr];
 
     while  (hex.eval(ival.x,ival.y,ival.z).volume() > threshold) {
