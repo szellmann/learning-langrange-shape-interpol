@@ -54,41 +54,53 @@ next:
     ival = stack[--ptr];
 
     while  (hex.eval(ival.x,ival.y,ival.z).volume() > threshold) {
-      interval3 c0, c1;
       int splitAxis = 0;
       if (ival.y.length() > ival.x.length())
         splitAxis = 1;
       if (ival.z.length() > ival.x.length() && ival.z.length() > ival.y.length())
         splitAxis = 2;
 
+      constexpr int N=2; // num children to split into
+      interval3 c[N];
       for (int a=0; a<3; ++a) {
         if (a == splitAxis) {
-          c0[a] = interval1(ival[a].lo,ival[a].lo+ival[a].length()*0.5f);
-          c1[a] = interval1(ival[a].lo+ival[a].length()*0.5f,ival[a].hi);
+          for (int i=0; i<N; ++i) {
+            c[i][a] = interval1(ival[a].lo+ival[a].length()*(i/float(N)),
+                                ival[a].lo+ival[a].length()*((i+1)/float(N)));
+          }
+          // set outer bounds exactly to avoid floating point error:
+          c[0][a].lo = ival[a].lo;
+          c[N-1][a].hi = ival[a].hi;
         } else {
-          c0[a] = ival[a];
-          c1[a] = ival[a];
+          for (int i=0; i<N; ++i) {
+            c[i][a] = ival[a];
+          }
         }
       }
 
-      bool b0 = hex.eval(c0.x,c0.y,c0.z).contains(P);
-      bool b1 = hex.eval(c1.x,c1.y,c1.z).contains(P);
+      bool b[N];
+      for (int i=0; i<N; ++i) {
+        b[i] = hex.eval(c[i].x,c[i].y,c[i].z).contains(P);
+      }
 
-      if (b0 && b1) {
-        stack[ptr++] = c0;
-        ival = c1;
-      } else if (b0) {
-        ival = c0;
-      } else if (b1) {
-        ival = c1;
-      } else {
+      bool assigned=false;
+      for (int i=0; i<N; ++i) {
+        if (!b[i]) continue;
+        if (assigned) {
+          stack[ptr++] = c[i];
+        } else {
+          ival = c[i];
+          assigned = true;
+        }
+      }
+
+      if (!assigned) {
         goto next;
       }
     }
 
     auto leafBounds = hex.eval(ival.x,ival.y,ival.z);
     if (leafBounds.volume() <= threshold) {
-      std::cout << leafBounds << '\n';
       if (leafBounds.contains(P))
         return true;
     }
@@ -103,7 +115,7 @@ int main() {
   auto data = test01(order);
   memcpy(hex.value,data.data(),sizeof(data[0])*data.size());
 
-  std::cout << sample(hex,float3(3.1f,1.f,1.f)) << '\n';
+  std::cout << sample(hex,float3(1.f,1.f,1.f)) << '\n';
 }
 
 
