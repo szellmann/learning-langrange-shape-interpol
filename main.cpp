@@ -3,6 +3,10 @@
 #include "data.h"
 #include "math.h"
 
+using float3 = math::vec3f;
+using interval1 = math::interval1f;
+using interval3 = math::interval3f;
+
 template <typename V>
 struct LagrangeHex
 {

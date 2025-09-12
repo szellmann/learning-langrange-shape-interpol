@@ -5,6 +5,8 @@
 // ours
 #include "math.h"
 
+using float3 = math::vec3f;
+
 static std::vector<float3> test01(int order) {
   int n = order;
   std::vector<float3> result;
